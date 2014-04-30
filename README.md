@@ -10,7 +10,7 @@ The only external dependency is [python-libusb1](https://github.com/vpelletier/p
 
 ### Specific udev rule ###
 
-You have to add a specific udev rule to allow access daplug USB devices. Create a file `/etc/udev/rules.d/10-daplug.rules`
+You have to add a specific udev rule to allow access daplug USB devices. Create a file `/etc/udev/rules.d/10-daplug.rules` with the content :
 
     SUBSYSTEMS=="usb", ATTRS{idVendor}=="2581", ATTRS{idProduct}=="1807", MODE="0660", GROUP="daplug"
     SUBSYSTEMS=="usb", ATTRS{idVendor}=="2581", ATTRS{idProduct}=="1808", MODE="0660", GROUP="daplug"

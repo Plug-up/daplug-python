@@ -92,7 +92,7 @@ class DaplugDongle:
         if (securityLevel & DaplugDongle.R_MAC) != 0:
             dataLength = len(data) / 2
             cardRmac = lst2hex(answer[-8:])
-            workAnswerForMac = apdu + "%02x" % dataLength + data + "%02x" % sw
+            workAnswerForMac = apdu + "%02x" % dataLength + data + "%04x" % sw
             calcRmac = retailMac(self.rmacKey, workAnswerForMac, self.rmac)
             if (cardRmac != calcRmac):
                 msg = "Invalid card RMAC " + cardRmac + " vs " + calcRmac
