@@ -262,7 +262,8 @@ def testRight(dongle):
 
 dongle = getFirstDongle()
 print "Found " + dongle.getMode() + " device"
-testBasic(dongle)
+# testBasic(dongle)
+dongle.setKeyboardAtBoot(False)
 
 # testRight(dongle)
 

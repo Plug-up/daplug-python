@@ -25,9 +25,9 @@ class HIDDongle:
     def getMode(self):
         return "hid"
 
-    def exchange(self, apdu, status=0x9000, throwErr=True):
+    def exchange(self, apdu, status=0x9000, throwErr=True, name=""):
         # APDU in "hex" format
-        dalog("==> " + apdu)
+        dalog(name + " ==> " + apdu)
         paddedApdu = zeroPad(hex2txt(apdu))
         remaining = len(paddedApdu)
         offset = 0
@@ -52,7 +52,7 @@ class HIDDongle:
             readSW = (ord(result[dataLength + 2]) << 8) + ord(result[dataLength + 3])
         else: # no response data available, read the SW immediately
             readSW =  (ord(result[0])  << 8) + ord(result[1])
-        dalog("<== (" + "%04x" % readSW + ") " + txt2hex(result[2:dataLength + 2]))
+        dalog(name + " <== (" + "%04x" % readSW + ") " + txt2hex(result[2:dataLength + 2]))
         if throwErr and readSW != status:
             raise DaplugException(readSW, "Invalid Status Word")
         return (txt2lst(result[2:dataLength + 2]), readSW)
