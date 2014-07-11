@@ -38,7 +38,7 @@ def testOneSC(dongle, secu, keys):
     dongle.authenticate(keys, secu)
     print("Serial: " + lst2hex(dongle.getSerial()))
     print("Serial: " + lst2hex(dongle.getSerial()))
-    dongle.deAuthenticate(keys.version)
+    dongle.deAuthenticate()
 
 def testSC(dongle):
     h1("Test Secure Channel")
@@ -56,15 +56,15 @@ def testPutKey(dongle):
     title("Putting new key")
     dongle.putKey(newKeys)
 
-    dongle.deAuthenticate(defKeys.version)
+    dongle.deAuthenticate()
     title("Testing new key")
     testOneSC(dongle, secu01, newKeys)
 
     title("Cleanup")
-    dongle.deAuthenticate(newKeys.version)
+    dongle.deAuthenticate()
     dongle.authenticate(defKeys, secu13)
     dongle.deleteKey(newKeys.version)
-    dongle.deAuthenticate(defKeys.version)
+    dongle.deAuthenticate()
 
 def testFiles(dongle):
     h1("Test Files")
@@ -94,7 +94,7 @@ def testFiles(dongle):
     dongle.selectFile(DaplugDongle.MASTER_FILE)
     dongle.deleteFileOrDir(0x2012)
     title("Done")
-    dongle.deAuthenticate(defKeys.version)
+    dongle.deAuthenticate()
 
 def testCrypto(dongle):
     h1("Test Crypto")
@@ -128,7 +128,7 @@ def testCrypto(dongle):
 
     title("Cleanup")
     dongle.deleteKey(cryptKey.version)
-    dongle.deAuthenticate(defKeys.version)
+    dongle.deAuthenticate()
 
 def testHMAC(dongle):
     h1("Test HMAC")
@@ -155,7 +155,7 @@ def testHMAC(dongle):
 
     title("Cleanup")
     dongle.deleteKey(hmacKey.version)
-    dongle.deAuthenticate(defKeys.version)
+    dongle.deAuthenticate()
 
 def testHOTP(dongle):
     hotpKeyVersion = 0x03
@@ -168,12 +168,6 @@ def testHOTP(dongle):
     print "Clean HOTP key ..."
     try:
         dongle.deleteKeys([hotpKeyVersion])
-    except DaplugException:
-        pass
-    print "Clean HID mapping file ..."
-    try:
-        dongle.selectFile(0x3F00)
-        dongle.deleteFileOrDir(0x0001)
     except DaplugException:
         pass
     print "Clean counter file ..."
@@ -195,11 +189,6 @@ def testHOTP(dongle):
     title("Creating a counter file")
     dongle.createCounterFile(0x42)
 
-    title("Creating the HID mapping file - not sure if really useful...")
-    dongle.selectFile(0x3F00)
-    dongle.createFile(0x0001, 16, DaplugDongle.ACCESS_ALWAYS)
-    dongle.write(0, "06050708090a0b0c0d0e0f1115171819")
-
     data = "%04x" % 0x42
     title("Testing HOTP with file " + data)
     dongle.selectPath([0x3F00])
@@ -207,7 +196,7 @@ def testHOTP(dongle):
     totp2 = dongle.hmac(hotpKey.version, DaplugDongle.OTP_6_DIGIT + DaplugDongle.HOTP_DATA_FILE, data)
 
     title("Cleanup")
-    dongle.deAuthenticate(defKeys.version)
+    dongle.deAuthenticate()
 
     print "Generated TOTP: " + lst2txt(totp1)
     print "Generated TOTP: " + lst2txt(totp2)
@@ -242,7 +231,7 @@ def testTOTP(dongle):
 
     title("Cleanup")
     dongle.deleteKeys([timeKeyVersion, totpKeyVersion])
-    dongle.deAuthenticate(defKeys.version)
+    dongle.deAuthenticate()
     print "Generated TOTP: " + totp
 
 def toggleMode(dongle):
@@ -263,7 +252,7 @@ def testRight(dongle):
 dongle = getFirstDongle()
 print "Found " + dongle.getMode() + " device"
 # testBasic(dongle)
-dongle.setKeyboardAtBoot(False)
+print("Serial: " + lst2hex(dongle.getSerial()))
 
 # testRight(dongle)
 
@@ -272,7 +261,7 @@ dongle.setKeyboardAtBoot(False)
 # testFiles(dongle)
 # testCrypto(dongle)
 # testHMAC(dongle)
-# testHOTP(dongle)
+testHOTP(dongle)
 # testTOTP(dongle)
 
 # toggleMode(dongle)

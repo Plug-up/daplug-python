@@ -25,64 +25,65 @@ class DaplugSAM:
     def __init__(self, dongle):
         self.d = dongle
 
-    def diversifyGP(self, keyVersion, keyID, gpKeyVersion, flags, seq, div1=None, div2=None):
+    def diversifyGP(self, keyVer, keyID, gpKeyVersion, flags, seq, div1=None, div2=None):
+        print("DIV GP: %02x %02x %02x %02x %04x" % (keyVer, keyID, gpKeyVersion, flags, seq))
         header = "D0700010"
-        cont = "%02x%02x%02x%02x" % (keyVersion, keyID, gpKeyVersion, flags)
+        cont = "%02x%02x%02x%02x" % (keyVer, keyID, gpKeyVersion, flags)
         cont += "%04x" % seq
         if (div1 is not None): cont += div1
         if (div2 is not None): cont += div2
         keys = self.d.__exchangeApdu2(header, cont)
         return [keys[i:i+24] for i in range(0, len(keys), 24)]
 
-    def diversifyPutKey(self, keyVersion, keyID, samProvKeyVersion, dekSession, div1=None, div2=None):
+    def diversifyPutKey(self, keyVer, keyID, samProvKeyVersion, dekSession, div1=None, div2=None):
         header = "D0700020"
         flags = 0
         if (div1 is not None): flags += 1
         if (div2 is not None): flags += 1
-        cont = "%02x%02x%02x%02x" % (keyVersion, keyID, samProvKeyVersion, flags)
+        cont = "%02x%02x%02x%02x" % (keyVer, keyID, samProvKeyVersion, flags)
         cont += dekSession
         if (div1 is not None): cont += div1
         if (div2 is not None): cont += div2
         keys = self.d.__exchangeApdu2(header, cont)
         return [(keys[i:i+16], keys[i+16:i+19]) for i in range(0, len(keys), 19)]
 
-    def diversifyCleartext(self, keyVersion, div1=None, div2=None):
+    def diversifyCleartext(self, keyVer, div1=None, div2=None):
         header = "D0700030"
         flags = 0
         if (div1 is not None): flags += 1
         if (div2 is not None): flags += 1
-        cont = "0000%02x%02x" % (keyVersion, flags)
+        cont = "0000%02x%02x" % (keyVer, flags)
         if (div1 is not None): cont += div1
         if (div2 is not None): cont += div2
         keys = self.d.__exchangeApdu2(header, cont)
         return [keys[i:i+16] for i in range(0, len(keys), 16)]
 
-    def __cryptDecrypt(self, act, keyVersion, keyID, sess, iv, cipherCtx, content, lastBlock):
+    def __cryptDecrypt(self, act, keyVer, keyID, sess, iv, cipherCtx, content, lastBlock):
         header = "D072"
         if lastBlock: header += "80"
         else: header += "00"
         header += "%02x" % act
-        cont = "%02x%02x" % (keyVersion, keyID)
+        cont = "%02x%02x" % (keyVer, keyID)
         cont += sess + iv + cipherCtx + content
         return lst2hex(self.d.__exchangeApdu2(header, cont))
 
-    def __encryptEnc(self, keyVersion, keyID, cEncSess, iv, cipherCtx, content, lastBlock=True):
+    def __encryptEnc(self, keyVer, keyID, cEncSess, iv, cipherCtx, content, lastBlock=True):
         if len(content) % 16 != 0:
             raise DaplugException(0x8101, "Content length must be a multiple of 8 bytes")
-        return self.__cryptDecrypt(0x10, keyVersion, keyID, cEncSess, iv, cipherCtx, content, lastBlock)
+        return self.__cryptDecrypt(0x10, keyVer, keyID, cEncSess, iv, cipherCtx, content, lastBlock)
 
-    def __encryptDek(self, keyVersion, keyID, dekSess, content, lastBlock):
-        return self.__cryptDecrypt(0x20, keyVersion, keyID, dekSess, "00"*8, "00"*9, content, lastBlock=True)
+    def __encryptDek(self, keyVer, keyID, dekSess, content, lastBlock=True):
+        return self.__cryptDecrypt(0x20, keyVer, keyID, dekSess, "00"*8, "00"*9, content, lastBlock)
 
-    def __decryptREnc(self, keyVersion, keyID, rEncSess, iv, cipherCtx, content, lastBlock):
-        return self.__cryptDecrypt(0x30, keyVersion, keyID, rEncSess, iv, cipherCtx, content, lastBlock=True)
+    def __decryptREnc(self, keyVer, keyID, rEncSess, iv, cipherCtx, content, lastBlock=True):
+        return self.__cryptDecrypt(0x30, keyVer, keyID, rEncSess, iv, cipherCtx, content, lastBlock)
 
-    def sign(self, act, keyVersion, keyID, sess, iv, signCtx, content, lastBlock=True):
+    def sign(self, act, keyVer, keyID, sess, iv, signCtx, content, lastBlock=True):
         header = "D074"
         if lastBlock: header += "80"
         else: header += "00"
         header += "%02x" % act
-        cont = "%02x%02x" % (keyVersion, keyID)
+        cont = "%02x%02x" % (keyVer, keyID)
         cont += sess + iv + signCtx + content
         # dalog("SIGN: " + cont)
         return lst2hex(self.d.__exchangeApdu2(header, cont))
@@ -103,20 +104,20 @@ class DaplugSAM:
                 context = res[16:34]
                 accRes += res[34:]
             else:
-                return res
+                accRes += res
+        return accRes
 
-    def computeRetailMac(self, act, keyVersion, keyID, sess, data, iv=None):
+    def computeRetailMac(self, act, keyVer, keyID, sess, data, iv=None):
         def f(iv, context, cont, last):
-            return self.sign(act, keyVersion, keyID, sess, iv, context, cont, last)
+            return self.sign(act, keyVer, keyID, sess, iv, context, cont, last)
         return self.__multiprocess(f, data, iv)
 
-    def encryptEnc(self, keyVersion, keyID, sess, data):
-        workData = data
+    def encryptEnc(self, keyVer, keyID, sess, data):
         def f(iv, context, cont, last):
-            return self.__encryptEnc(keyVersion, keyID, sess, iv, context, cont, last)
-        return self.__multiprocess(f, workData)
+            return self.__encryptEnc(keyVer, keyID, sess, iv, context, cont, last)
+        return self.__multiprocess(f, data)
         
-    def decryptREnc(self, keyVersion, keyID, sess, data):
+    def decryptREnc(self, keyVer, keyID, sess, data):
         def f(iv, context, cont, last):
-            return self.__decryptREnc(keyVersion, keyID, sess, iv, context, cont, last)
+            return self.__decryptREnc(keyVer, keyID, sess, iv, context, cont, last)
         return self.__multiprocess(f, data)

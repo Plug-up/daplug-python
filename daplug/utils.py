@@ -69,7 +69,7 @@ def cbcDES(key, data):
 
 def computeKCV(data):
     """Compute a KCV for the PUT KEY command"""
-    des = DES3.new(data, DES3.MODE_CBC)
+    des = DES3.new(data, DES3.MODE_CBC, ZERO)
     res = des.encrypt(ZERO)
     return txt2hex(res[0:3])
 

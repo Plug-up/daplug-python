@@ -48,6 +48,9 @@ class DaplugDongle:
         """Send an APDU to the dongle and get a response"""
         return self.device.exchange(apdu, status, throwErr, self.name)
 
+    def testApdu(self, apdu):
+        self.__exchangeRawApdu(apdu)
+
     def __wrap(self, apdu):
         """
         Wrap an APDU over the Secure Channel
@@ -70,7 +73,7 @@ class DaplugDongle:
                 self.cmac = retailMac(self.cmacKey, workApduForMac)
             else:
                 self.cmac = self.sam.computeRetailMac(
-                    DaplugSAM.SIGN_CMAC, self.samCtxKeyVersion, self.samCtxKeyID,
+                    DaplugSAM.SIGN_CMAC, self.samCtxKeyVer, self.samCtxKeyID,
                     self.cmacKey, workApduForMac)
         if (securityLevel & DaplugDongle.C_DEC) != 0:
             apduData = ""
@@ -78,7 +81,7 @@ class DaplugDongle:
                 apduData = encryptEnc(self.sencKey, apdu[10:])
             else:
                 apduData = self.sam.encryptEnc(
-                    self.samCtxKeyVersion, self.samCtxKeyID,
+                    self.samCtxKeyVer, self.samCtxKeyID,
                     self.sencKey, apdu[10:])
             updatedDataLength = len(apduData) / 2
             if (securityLevel & DaplugDongle.C_MAC) != 0:
@@ -106,7 +109,7 @@ class DaplugDongle:
                 data = decryptData(self.rencKey, data)
             else:
                 data = self.sam.decryptREnc(
-                    self.samCtxKeyVersion, self.samCtxKeyID,
+                    self.samCtxKeyVer, self.samCtxKeyID,
                     self.rencKey, data)
         if (securityLevel & DaplugDongle.R_MAC) != 0:
             dataLength = len(data) / 2
@@ -117,7 +120,7 @@ class DaplugDongle:
                 calcRmac = retailMac(self.rmacKey, workAnswerForMac, self.rmac)
             else:
                 calcRmac = self.sam.computeRetailMac(
-                    DaplugSAM.SIGN_RMAC, self.samCtxKeyVersion, self.samCtxKeyID,
+                    DaplugSAM.SIGN_RMAC, self.samCtxKeyVer, self.samCtxKeyID,
                     self.rmacKey, workAnswerForMac, self.rmac)
             if (cardRmac != calcRmac):
                 msg = "Invalid card RMAC " + cardRmac + " vs " + calcRmac
@@ -205,9 +208,9 @@ class DaplugDongle:
         externalAuthenticate = self.__wrap(extAuthApdu)
         self.__exchangeRawApdu(externalAuthenticate)[0]
 
-    def authenticateSam(self, sam, samCtxKeyVersion, samCtxKeyID, samGPKeyVersion, cardKeyVersion, mode, div1=None, div2=None):
+    def authenticateSam(self, sam, samCtxKeyVer, samCtxKeyID, samGPKeyVersion, cardKeyVersion, mode, div1=None, div2=None):
         self.sam = sam
-        self.samCtxKeyVersion = samCtxKeyVersion
+        self.samCtxKeyVer = samCtxKeyVer
         self.samCtxKeyID = samCtxKeyID
         hostChallenge = ""
         for x in range(8):
@@ -222,19 +225,18 @@ class DaplugDongle:
         flags = DaplugSAM.GENERATE_DEK + DaplugSAM.GENERATE_RMAC + DaplugSAM.GENERATE_RENC
         if div1 is not None: flags += 1
         if div2 is not None: flags += 1
-        print("DIV GP")
-        sessKeys = sam.diversifyGP(samCtxKeyVersion, samCtxKeyID, samGPKeyVersion, flags, sequenceCounter, div1, div2)
+        sessKeys = sam.diversifyGP(samCtxKeyVer, samCtxKeyID, samGPKeyVersion, flags, sequenceCounter, div1, div2)
         for sesskey in sessKeys:
             print("> " + lst2hex(sesskey))
 
         self.sencKey = lst2hex(sessKeys[0])
         self.cmacKey = lst2hex(sessKeys[1])
-        self.sdekKey = lst2txt(sessKeys[2])
+        self.sdekKey = lst2hex(sessKeys[2])
         self.rmacKey = lst2hex(sessKeys[3])
         self.rencKey = lst2hex(sessKeys[4])
 
         computedCardCryptogram = self.sam.sign(
-            DaplugSAM.SIGN_ENC, samCtxKeyVersion, samCtxKeyID, self.sencKey,
+            DaplugSAM.SIGN_ENC, samCtxKeyVer, samCtxKeyID, self.sencKey,
             "00"*8, "00"*9, hostChallenge + cardChallenge
         )
         dalog("Card cryptogram:")
@@ -242,7 +244,7 @@ class DaplugDongle:
         if computedCardCryptogram != cardCryptogram:
             raise DaplugException(0x8010, "Invalid card cryptogram")
         hostCryptogram = self.sam.sign(
-            DaplugSAM.SIGN_ENC, samCtxKeyVersion, samCtxKeyID, self.sencKey,
+            DaplugSAM.SIGN_ENC, samCtxKeyVer, samCtxKeyID, self.sencKey,
             "00"*8, "00"*9, cardChallenge + hostChallenge
         )
 
@@ -255,7 +257,7 @@ class DaplugDongle:
         externalAuthenticate = self.__wrap(extAuthApdu)
         self.__exchangeRawApdu(externalAuthenticate)[0]
 
-    def deAuthenticate(self, keyVersion):
+    def deAuthenticate(self):
         """@DaplugDongle.deAuthenticate"""
         self.sam = None
         self.sessionOpen = False
@@ -270,6 +272,8 @@ class DaplugDongle:
 
     def putKey(self, keys):
         """@DaplugDongle.putKey"""
+        if self.sam is not None:
+            raise DaplugException(0x8000, "Invalid auth method")
         if (keys.encKey is None or keys.macKey is None or keys.dekKey is None):
             raise DaplugException(0x8001, "Missing key")
         if (keys.usage is None):
@@ -292,6 +296,26 @@ class DaplugDongle:
         apdu = "80d8" + '%02x' % keys.version + "81"
         apdu = apdu + '%02x' % (len(data) / 2) + data
         self.__exchangeApdu(apdu)
+
+    def putKeySam(self, keyVer, access, usage, samProvKey, div1=None, div2=None, selfParent=False):
+        if self.sam is None:
+            raise DaplugException(0x8000, "Invalid auth method")
+        if selfParent:
+            usage = usage + 0x80
+        header = "80d8" + '%02x' % keyVer + "81"
+
+        data = '%02x' % keyVer
+        keys = self.sam.diversifyPutKey(self.samCtxKeyVer, self.samCtxKeyID, samProvKey, self.sdekKey, div1, div2)
+
+        def aux(i):
+            acc = "ff8010" + lst2hex(keys[i][0]) + "03" + lst2hex(keys[i][1])
+            acc += "01" + '%02x' % usage
+            acc += "02" + '%04x' % access
+            return acc
+
+        data += aux(0) + aux(1) + aux(2)
+
+        self.__exchangeApdu2(header, data)
 
     def exportKey(self, version, keyID):
         """@DaplugDongle.exportKey"""
