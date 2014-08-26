@@ -79,6 +79,8 @@ def __test(dongle):
 
     # Swith to USB
     hid.exchange("D052080200")
+    # Reset
+    hid.exchange("D052010000")
     hid.close()
 
 def __main():

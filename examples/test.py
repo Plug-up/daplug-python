@@ -169,7 +169,7 @@ def testHOTP(dongle):
     try:
         dongle.deleteKeys([hotpKeyVersion])
     except DaplugException:
-        pass
+        pass 
     print "Clean counter file ..."
     try:
         dongle.selectFile(0xC010)
@@ -188,6 +188,7 @@ def testHOTP(dongle):
 
     title("Creating a counter file")
     dongle.createCounterFile(0x42)
+    dongle.selectFile(0x42)
 
     data = "%04x" % 0x42
     title("Testing HOTP with file " + data)
@@ -198,8 +199,8 @@ def testHOTP(dongle):
     title("Cleanup")
     dongle.deAuthenticate()
 
-    print "Generated TOTP: " + lst2txt(totp1)
-    print "Generated TOTP: " + lst2txt(totp2)
+    print "Generated HOTP: " + lst2txt(totp1)
+    print "Generated HOTP: " + lst2txt(totp2)
 
 def testTOTP(dongle):
     timeKeyVersion = 0x04
@@ -249,19 +250,96 @@ def testRight(dongle):
     dongle.authenticate(defKeys, secu01)
     print("READ: " + lst2hex(dongle.read(0, 2)))
 
+def testHOTPKeyboard(dongle):
+    hotpVer = 0x02
+    hotpKey = "716704022D872983665A03E6C39EC117C084228A"
+    counterFile = 0x1001
+    kbFile = 0x0800
+
+    print("Authenticate")
+    dongle.authenticate(defKeys, secu01)
+
+    print("Go to root just in case")
+    dongle.selectFile(0x3F00)
+
+    print("Try to clean things")
+    try:
+        dongle.setKeyboardAtBoot(False)
+    except DaplugException:
+        pass
+    try:
+        dongle.deleteKeys([hotpVer])
+        dongle.selectFile(0x3F00)
+    except DaplugException:
+        pass
+    try:
+        dongle.deleteFileOrDir(kbFile)
+    except DaplugException:
+        pass
+
+    try:
+        dongle.deleteFileOrDir(0x0001)
+    except DaplugException:
+        pass
+
+    try:
+        dongle.selectPath([DaplugDongle.MASTER_FILE, 0xC010])
+        dongle.deleteFileOrDir(counterFile)
+    except DaplugException:
+        pass
+
+    print("Create counter file")
+    dongle.createCounterFile(counterFile)
+    
+    print("Create HMAC key")
+    keyLen = len(hotpKey) / 2
+    keys = splitKey(hotpKey)
+    hotpKey = KeySet(0x02, keys[0], keys[1], keys[2])
+    hotpKey.setKeyAccess(0x0000 + keyLen)
+    hotpKey.setKeyUsage(KeySet.USAGE_HOTP)
+    dongle.putKey(hotpKey)
+
+    print("Create HID mapping file")
+    dongle.selectFile(0x3f00)
+    dongle.createFile(0x0001, 10)
+    # HID mapping :   b c d e f g h i j k
+    dongle.write(0, "05060708090a0b0c0d0e")
+
+    print("Create personalization file")
+    dongle.selectFile(0x3f00)
+    dongle.createFile(kbFile, 64)
+
+    print("Prepare personalization file content")
+    kb = KeyBoard()
+    kb.addSleep(0xFFFF)
+    kb.addSleep(0xFFFF)
+    kb.addSleep(0xFFFF)
+    kb.addSleep(0xFFFF)
+    # 04 is to use HID mapping - 02 is for numeric (not very good)
+    kb.addHotpCode(0x04, 0x08, hotpVer, counterFile)
+    kb.zeroPad(64)
+    dongle.write(0, kb.content)
+
+    print("Set keyboard at boot")
+    dongle.useAsKeyboard()
+    dongle.setKeyboardAtBoot(True)
+
+    print("Go HID if required")
+    if dongle.getMode() == "usb":
+        dongle.usb2hid()
+
 dongle = getFirstDongle()
 print "Found " + dongle.getMode() + " device"
 # testBasic(dongle)
-print("Serial: " + lst2hex(dongle.getSerial()))
 
+# testHOTPKeyboard(dongle)
 # testRight(dongle)
-
 # testSC(dongle)
 # testPutKey(dongle)
 # testFiles(dongle)
 # testCrypto(dongle)
 # testHMAC(dongle)
-testHOTP(dongle)
+# testHOTP(dongle)
 # testTOTP(dongle)
 
 # toggleMode(dongle)

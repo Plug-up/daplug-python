@@ -189,7 +189,7 @@ class DaplugDongle:
             hostChallenge = challenge
         res = self.__exchangeRawApdu("8050" + '%02x' % keys.version + "0008" + hostChallenge)[0]
         sequenceCounter = lst2hex(res[12:14])
-        cardChallenge = lst2hex(res[12:20])
+        cardChallenge = lst2hex(res[12:20]) # Get seq + challenge because they are used together
         cardCryptogram = lst2hex(res[20:28])
         self.sencKey = derive(keys.encKey, "0182", sequenceCounter)
         computedCardCryptogram = signSEnc(self.sencKey, hostChallenge + cardChallenge)
@@ -614,3 +614,15 @@ def getDongle((mode, dongle), name=""):
 def getFirstDongle(name=""):
     """Convenience function to return the first available dongle"""
     return getDongle(getDongleList()[0], name)
+
+def getPort(device):
+    portNum = device.getPortNumberList()
+    portNum[:0] = [device.getBusNumber()]
+    return portNum
+
+def getDongleByPort(port, name=""):
+    res = None
+    for (mode,dongle) in getDongleList():
+        if getPort(dongle) == port:
+            res = getDongle((mode, dongle), name)
+    return res
