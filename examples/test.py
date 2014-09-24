@@ -66,6 +66,52 @@ def testPutKey(dongle):
     dongle.deleteKey(newKeys.version)
     dongle.deAuthenticate()
 
+def testTransient(dongle):
+    secu = secu33
+    vv = 0xF0
+    testKeys = KeySet(vv, "000102030405060708090A0B0C0D0E0F", "101112131415161718191A1B1C1D1E1F", "202122232425262728292A2B2C2D2E2F")
+    testKeys.setKeyAccess(0x0000)
+    testKeys.setKeyUsage(KeySet.USAGE_GP)
+
+    testKeys2 = KeySet(vv, "101112131415161718191A1B1C1D1E1F", "202122232425262728292A2B2C2D2E2F", "000102030405060708090A0B0C0D0E0F")
+    testKeys2.setKeyAccess(0x0000)
+    testKeys2.setKeyUsage(KeySet.USAGE_GP)
+
+    title("Putting first key")
+    dongle.authenticate(defKeys, secu)
+    dongle.putKey(testKeys)
+
+    title("Exporting first key")
+    exportData = dongle.exportKey(0xFD, 1)
+    print("Export: " + exportData)
+
+    title("Testing first key")
+    dongle.deAuthenticate()
+    testOneSC(dongle, secu, testKeys)
+    dongle.getSerial()
+
+    title("Putting another key")
+    dongle.deAuthenticate()
+    dongle.authenticate(defKeys, secu)
+    dongle.putKey(testKeys2)
+
+    title("Testing second key")
+    dongle.deAuthenticate()
+    testOneSC(dongle, secu, testKeys2)
+    dongle.getSerial()
+
+    title("Re-importing first key")
+    dongle.deAuthenticate()
+    dongle.importKey(0xFD, 1, exportData)
+    
+    title("Testing imported key")
+    dongle.deAuthenticate()
+    testOneSC(dongle, secu, testKeys)
+    dongle.getSerial()
+
+    title("All tests OK !")
+    dongle.deAuthenticate()
+
 def testFiles(dongle):
     h1("Test Files")
     text = "abbe1acceda1accede1accede1baba1baffe1baffee1ba0bab1bebe1b0b01caca1cacaba1cacabe1caca01cade1cafe1ceda1cede1cedee1c0bea1c0ca1c0c01c0da1c0dee1dada1deca1decade1decede1decedee1dec0da1dec0de1dec0dee1d0d01ecaffa1ecaffe1ecaffe1ecaffee1eccaca1efface1effacee1facade1face1faceaface1fada1fade1fadee1fad01abbe1acceda1accede1accede1baba1baffe1baffee1ba0bab1bebe1b0b01caca1cacaba1cacabe1caca01cade1cafe1ceda1cede1cedee1c0bea1c0ca1c0c01c0da1c0dee1dada1deca1decade1decede1decedee1dec0da1dec0de1dec0dee1d0d01ecaffa1ecaffe1ecaffe1ecaffee1eccaca1efface1effacee1facade1face1faceaface1fada1fade1fadee1fad01abbe1acceda1accede1accede1baba1baffe1baffee1ba0bab1bebe1b0b01caca1cacaba1cacabe1caca01cade1cafe1ceda1cede1cedee1c0bea1c0ca1c0c01c0da1c0dee1dada1deca1decade1decede1decedee1dec0da1dec0de1dec0dee1d0d01ecaffa1ecaffe1ecaffe1ecaffee1eccaca1efface1effacee1facade1face1faceaface1fada1fade1fadee1fad01abbe1acceda1accede1accede1baba1baffe1baffee1ba0bab1bebe1b0b01caca1cacaba1cacabe1caca01cade1cafe1ceda1cede1cedee1c0bea1c0ca1c"
@@ -169,7 +215,7 @@ def testHOTP(dongle):
     try:
         dongle.deleteKeys([hotpKeyVersion])
     except DaplugException:
-        pass 
+        pass
     print "Clean counter file ..."
     try:
         dongle.selectFile(0xC010)
@@ -188,7 +234,6 @@ def testHOTP(dongle):
 
     title("Creating a counter file")
     dongle.createCounterFile(0x42)
-    dongle.selectFile(0x42)
 
     data = "%04x" % 0x42
     title("Testing HOTP with file " + data)
@@ -199,8 +244,8 @@ def testHOTP(dongle):
     title("Cleanup")
     dongle.deAuthenticate()
 
-    print "Generated HOTP: " + lst2txt(totp1)
-    print "Generated HOTP: " + lst2txt(totp2)
+    print "Generated TOTP: " + lst2txt(totp1)
+    print "Generated TOTP: " + lst2txt(totp2)
 
 def testTOTP(dongle):
     timeKeyVersion = 0x04
@@ -246,9 +291,9 @@ def toggleMode(dongle):
 def testRight(dongle):
     title("Test Rights")
     dongle.selectPath([0x3F00, 0xC00F, 0xD00D, 0xA1BA])
-    print("READ: " + lst2hex(dongle.read(0, 2)))
-    dongle.authenticate(defKeys, secu01)
-    print("READ: " + lst2hex(dongle.read(0, 2)))
+    print("READ: " + str(dongle.read(0, 2) == [255, 255]))
+    # dongle.authenticate(defKeys, secu01)
+    # print("READ: " + lst2hex(dongle.read(0, 2)))
 
 def testHOTPKeyboard(dongle):
     hotpVer = 0x02
@@ -328,14 +373,17 @@ def testHOTPKeyboard(dongle):
     if dongle.getMode() == "usb":
         dongle.usb2hid()
 
-dongle = getFirstDongle()
-print "Found " + dongle.getMode() + " device"
-# testBasic(dongle)
 
+dongle = getFirstDongle()
+
+print "Found " + dongle.getMode() + " device"
+
+# testBasic(dongle)
 # testHOTPKeyboard(dongle)
 # testRight(dongle)
 # testSC(dongle)
 # testPutKey(dongle)
+# testTransient(dongle)
 # testFiles(dongle)
 # testCrypto(dongle)
 # testHMAC(dongle)

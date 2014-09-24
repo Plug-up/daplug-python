@@ -198,7 +198,7 @@ class DaplugDongle:
         hostCryptogram = signSEnc(self.sencKey, cardChallenge + hostChallenge)
 
         self.cmacKey = derive(keys.macKey, "0101", sequenceCounter)
-        self.rmacKey = derive(keys.encKey, "0102", sequenceCounter)
+        self.rmacKey = derive(keys.macKey, "0102", sequenceCounter)
         self.sdekKey = derive(keys.dekKey, "0181", sequenceCounter)
         self.rencKey = derive(keys.encKey, "0183", sequenceCounter)
         self.securityLevel = mode
@@ -317,13 +317,15 @@ class DaplugDongle:
 
         self.__exchangeApdu2(header, data)
 
-    def exportKey(self, version, keyID):
+    def exportKey(self, keyVersion, keyID):
         """@DaplugDongle.exportKey"""
-        pass
+        apdu = "D0A0" + "%02x" % keyVersion + "%02x" % keyID + "00"
+        return lst2hex(self.__exchangeApdu(apdu))
 
-    def importKey(self, version, keyID, keys):
+    def importKey(self, keyVersion, keyID, data):
         """@DaplugDongle.importKey"""
-        pass
+        header = "D0A2" + "%02x" % keyVersion + "%02x" % keyID
+        self.__exchangeApdu2(header, data)
 
     # File constants
 

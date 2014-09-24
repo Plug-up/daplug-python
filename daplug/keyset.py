@@ -36,7 +36,7 @@ class KeySet:
     USAGE_SAM_CTX                 = 0x09
     """@KeySet.USAGE_SAM_CTX"""
 
-    USAGE_SAM_GP                  = 0x01
+    USAGE_SAM_GP                  = 0x0A
     """@KeySet.USAGE_SAM_GP"""
 
     USAGE_SAM_DIV1                = 0x0B
